@@ -72,3 +72,28 @@ def get_listening_ports():
             unique.append((port, protocol, status, name, username, exe))
 
     return unique
+
+
+def get_pids_for_port(port):
+    """
+    Retourne l'ensemble des PIDs des processus en écoute sur le port donné (TCP ou UDP).
+
+    Args:
+        port: Numéro de port (int).
+
+    Returns:
+        set: Ensemble des PIDs, ou set vide si aucun ou accès refusé.
+    """
+    pids = set()
+    try:
+        connections = psutil.net_connections(kind="inet")
+    except (psutil.AccessDenied, psutil.Error):
+        return pids
+
+    for conn in connections:
+        if conn.status != "LISTEN" or conn.laddr is None:
+            continue
+        if conn.laddr.port == port and conn.pid is not None:
+            pids.add(conn.pid)
+
+    return pids

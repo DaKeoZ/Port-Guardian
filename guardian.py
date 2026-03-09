@@ -3,6 +3,8 @@
 Port-Guardian — Point d'entrée CLI pour lister les ports en écoute.
 """
 
+import argparse
+import sys
 import time
 
 from rich.console import Console
@@ -10,7 +12,10 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from scanner import get_listening_ports
+import psutil
+
+from actions import kill_process
+from scanner import get_listening_ports, get_pids_for_port
 
 console = Console()
 
@@ -73,7 +78,47 @@ def run_scan_with_progress():
     return ports
 
 
+def run_kill_port(port):
+    """
+    Trouve les PIDs associés au port, demande confirmation, puis exécute kill_process.
+    """
+    pids = get_pids_for_port(port)
+    if not pids:
+        console.print(f"[red]Aucun processus en écoute sur le port {port}.[/]")
+        sys.exit(1)
+
+    rep = input(f"Êtes-vous sûr de vouloir libérer le port {port} ? [y/N] ").strip().lower()
+    if rep not in ("y", "yes"):
+        console.print("Annulé.")
+        return
+
+    for pid in pids:
+        try:
+            kill_process(pid)
+            console.print(f"[green]Processus {pid} arrêté. Port {port} libéré.[/]")
+        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+            console.print(f"[red]Impossible d'arrêter le processus {pid}: {e}[/]")
+            sys.exit(1)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Port-Guardian — Surveillance des ports en écoute.")
+    parser.add_argument(
+        "--kill",
+        type=int,
+        metavar="PORT",
+        help="Libérer le port en arrêtant le processus associé (demande confirmation).",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
+    if args.kill is not None:
+        run_kill_port(args.kill)
+        return
+
     # Panneau d'accueil
     console.print(
         Panel(
