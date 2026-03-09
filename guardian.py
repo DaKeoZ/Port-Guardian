@@ -8,8 +8,8 @@ from scanner import get_listening_ports
 
 def main():
     ports = get_listening_ports()
-    for port, protocol, status in ports:
-        print(f"[{port}] [{protocol}] [{status}]")
+    for port, protocol, status, process_name, username, exe_path in ports:
+        print(f"[{port}] [{protocol}] [{status}] [{process_name}] [{username}] [{exe_path}]")
 
 
 if __name__ == "__main__":
