@@ -25,12 +25,30 @@ COLOR_UDP = "yellow"
 COLOR_STATUS = "green"
 
 
-def display_dashboard(ports):
+def apply_filters(ports, args):
+    """
+    Filtre la liste des ports selon --search, --tcp-only, --udp-only.
+    """
+    result = list(ports)
+    if args.search:
+        term = args.search.lower()
+        result = [
+            row for row in result
+            if term in (row[3] or "").lower()  # process_name
+        ]
+    if args.tcp_only:
+        result = [row for row in result if row[1] == "TCP"]
+    if args.udp_only:
+        result = [row for row in result if row[1] == "UDP"]
+    return result
+
+
+def display_dashboard(ports, title="Port-Guardian Dashboard"):
     """
     Affiche un tableau stylisé des ports en écoute avec couleurs TCP/UDP et status.
     """
     table = Table(
-        title="Port-Guardian Dashboard",
+        title=title,
         show_header=True,
         header_style="bold white",
         border_style="dim",
@@ -109,6 +127,24 @@ def parse_args():
         metavar="PORT",
         help="Libérer le port en arrêtant le processus associé (demande confirmation).",
     )
+    filtres = parser.add_argument_group("filtres d'affichage")
+    filtres.add_argument(
+        "--search",
+        type=str,
+        metavar="NAME",
+        help="N'afficher que les ports des processus dont le nom contient NAME (ex: nginx, java).",
+    )
+    proto = filtres.add_mutually_exclusive_group()
+    proto.add_argument(
+        "--tcp-only",
+        action="store_true",
+        help="N'afficher que les ports TCP.",
+    )
+    proto.add_argument(
+        "--udp-only",
+        action="store_true",
+        help="N'afficher que les ports UDP.",
+    )
     return parser.parse_args()
 
 
@@ -135,9 +171,23 @@ def main():
     ports = run_scan_with_progress()
     console.print()
 
-    # Tableau des résultats
-    if ports:
-        display_dashboard(ports)
+    # Application des filtres
+    filtered = apply_filters(ports, args)
+    title = "Port-Guardian Dashboard"
+    parts = []
+    if args.search:
+        parts.append(f"processus « {args.search} »")
+    if args.tcp_only:
+        parts.append("TCP uniquement")
+    if args.udp_only:
+        parts.append("UDP uniquement")
+    if parts:
+        title += " — " + ", ".join(parts)
+
+    if filtered:
+        display_dashboard(filtered, title=title)
+    elif ports:
+        console.print("[yellow]Aucun port ne correspond aux filtres appliqués.[/]")
     else:
         console.print("[yellow]Aucun port en écoute trouvé (ou accès refusé).[/]")
 
